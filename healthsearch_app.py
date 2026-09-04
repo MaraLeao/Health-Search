@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-about:blank#blocked
 """
 HealthSearch — Motor de Busca Híbrido (BM25 + Busca Semântica Vetorial + RRF)
 ==============================================================================
