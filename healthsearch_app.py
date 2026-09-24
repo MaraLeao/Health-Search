@@ -1,27 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-HealthSearch — Motor de Busca Híbrido (BM25 + Busca Semântica Vetorial + RRF)
-==============================================================================
-Desafio Integrador — UNIPÊ
-Disciplina: Tendências em Ciência da Computação — Recuperação de Informação / PLN
-Professor: Me. Ricardo Roberto de Lima
-
-Como executar:
-    pip install streamlit pandas numpy rank_bm25 scikit-learn sentence-transformers
-    streamlit run healthsearch_app.py
-
-Observação sobre o motor semântico:
-    O app tenta carregar um modelo real de Sentence-Transformers
-    ('paraphrase-multilingual-MiniLM-L12-v2'). Caso a biblioteca não esteja
-    instalada ou não haja acesso à internet para baixar o modelo, o sistema
-    cai automaticamente em um MODO DE SIMULAÇÃO VETORIAL, documentado na
-    seção "Motor Semântico (Fase 3)" abaixo, que expande os termos da
-    consulta/documentos para "conceitos clínicos" equivalentes (sinônimos
-    médicos) e então vetoriza com TF-IDF + similaridade de cosseno. Isso
-    reproduz, de forma didática, a capacidade de um motor semântico real de
-    aproximar termos como "infarto" e "síndrome coronariana aguda".
-"""
-
 import re
 import numpy as np
 import pandas as pd
@@ -47,11 +23,6 @@ try:
     REAL_EMBEDDINGS_AVAILABLE = True
 except Exception:
     REAL_EMBEDDINGS_AVAILABLE = False
-
-
-# ==========================================================================
-# FASE 1 — INGESTÃO DO CORPUS MÉDICO E PRÉ-PROCESSAMENTO
-# ==========================================================================
 
 CORPUS = [
     {
@@ -109,7 +80,6 @@ CORPUS = [
     },
 ]
 
-# Stopwords em português (lista curada, evita dependência de downloads do NLTK)
 STOPWORDS_PT = {
     "a", "o", "e", "é", "de", "do", "da", "dos", "das", "em", "um", "uma",
     "uns", "umas", "para", "com", "sem", "por", "que", "se", "na", "no",
@@ -121,34 +91,22 @@ STOPWORDS_PT = {
     "até", "sob", "entre", "após", "sobre",
 }
 
-
 def preprocess(text: str, remove_stopwords: bool = True) -> list:
     """Fase 1: normalização, limpeza e tokenização do texto clínico."""
     text = text.lower()
-    text = re.sub(r"[^a-zà-ÿ0-9\s\-]", " ", text)  # remove pontuação/caracteres especiais
+    text = re.sub(r"[^a-zà-ÿ0-9\s\-]", " ", text) 
     tokens = text.split()
     if remove_stopwords:
         tokens = [t for t in tokens if t not in STOPWORDS_PT]
     return tokens
 
 
-# Pré-processa o corpus uma única vez
 for doc in CORPUS:
     doc["tokens"] = preprocess(doc["texto"])
 
 TOKENIZED_CORPUS = [doc["tokens"] for doc in CORPUS]
 RAW_TEXTS = [doc["texto"] for doc in CORPUS]
 
-
-# ==========================================================================
-# FASE 3 — MOTOR SEMÂNTICO VETORIAL (com modo simulado documentado)
-# ==========================================================================
-
-# Dicionário de expansão de conceitos clínicos, usado apenas no MODO
-# SIMULADO. Cada chave é um termo/sinônimo de entrada e o valor é o
-# "conceito canônico" ao qual ele pertence — assim, termos leigos e termos
-# técnicos passam a compartilhar dimensões no espaço vetorial (TF-IDF),
-# imitando o comportamento de um embedding semântico real.
 CONCEITOS_CLINICOS = {
     "infarto": "conceito_sindrome_coronariana_aguda",
     "ataque": "conceito_sindrome_coronariana_aguda",
@@ -210,7 +168,6 @@ def semantic_search(query: str):
         sims = st_util.cos_sim(query_embedding, doc_embeddings).cpu().numpy().flatten()
         return sims
     else:
-        # Modo simulado: expande conceitos e usa TF-IDF + cosseno
         corpus_expandido = [expandir_conceitos(doc["tokens"]) for doc in CORPUS]
         query_tokens = preprocess(query)
         query_expandida = expandir_conceitos(query_tokens)
@@ -219,11 +176,6 @@ def semantic_search(query: str):
         sims = cosine_similarity(query_vec, doc_matrix).flatten()
         return sims
 
-
-# ==========================================================================
-# FASE 2 — MOTOR LÉXICO (BM25) COM PARÂMETROS INTERATIVOS
-# ==========================================================================
-
 def bm25_search(query: str, k1: float, b: float):
     """Fase 2: retorna scores do BM25 Okapi calibrado por k1 e b."""
     bm25 = BM25Okapi(TOKENIZED_CORPUS, k1=k1, b=b)
@@ -231,17 +183,11 @@ def bm25_search(query: str, k1: float, b: float):
     scores = bm25.get_scores(query_tokens)
     return scores
 
-
-# ==========================================================================
-# FASE 4 — FUSÃO RRF (RECIPROCAL RANK FUSION)
-# ==========================================================================
-
-K_RRF = 60  # constante de suavização de posição
-
+K_RRF = 60
 
 def scores_to_ranks(scores: np.ndarray) -> dict:
     """Converte um vetor de scores em um dicionário {indice_doc: rank (1..N)}."""
-    ordem = np.argsort(-scores)  # ordem decrescente de score
+    ordem = np.argsort(-scores) 
     ranks = {}
     for posicao, idx in enumerate(ordem):
         ranks[idx] = posicao + 1
@@ -261,14 +207,8 @@ def rrf_fusion(rank_bm25: dict, rank_semantico: dict, alpha: float, k_rrf: int =
         score_rrf[idx] = score
     return score_rrf
 
-
-# ==========================================================================
-# INTERFACE STREAMLIT
-# ==========================================================================
-
 st.set_page_config(page_title="HealthSearch — Busca Híbrida", page_icon="🩺", layout="wide")
 
-# Remove o botão "Deploy" da barra superior do Streamlit
 st.markdown(
     """
     <style>
@@ -296,7 +236,6 @@ else:
         icon="ℹ️",
     )
 
-# ---------------------------- Sidebar -----------------------------------
 st.sidebar.header("⚙️ Calibração do Motor")
 
 st.sidebar.subheader("Fase 2 — BM25 (Léxico)")
@@ -320,7 +259,6 @@ exemplos = {
 }
 exemplo_escolhido = st.sidebar.selectbox("Carregar exemplo:", ["(nenhum)"] + list(exemplos.keys()))
 
-# ---------------------------- Query input --------------------------------
 default_query = exemplos.get(exemplo_escolhido, "") if exemplo_escolhido != "(nenhum)" else ""
 query = st.text_input("Digite sua consulta clínica:", value=default_query, placeholder="ex.: infarto, CÓD-ECG-12D, AAS 100mg...")
 
@@ -330,24 +268,19 @@ if buscar or query:
     if not query.strip():
         st.warning("Digite uma consulta para buscar.")
     else:
-        # --- Fase 1: tokens da consulta ---
         query_tokens = preprocess(query)
         with st.expander("🧪 Fase 1 — Pré-processamento da consulta"):
             st.write(f"**Consulta original:** {query}")
             st.write(f"**Tokens após limpeza/stopwords:** {query_tokens}")
 
-        # --- Fase 2: BM25 ---
         bm25_scores = bm25_search(query, k1, b)
         rank_bm25 = scores_to_ranks(bm25_scores)
 
-        # --- Fase 3: Semântico ---
         sem_scores = semantic_search(query)
         rank_semantico = scores_to_ranks(sem_scores)
 
-        # --- Fase 4: RRF ---
         rrf_scores = rrf_fusion(rank_bm25, rank_semantico, alpha)
 
-        # Monta DataFrame consolidado
         rows = []
         for idx, doc in enumerate(CORPUS):
             rows.append({
@@ -411,5 +344,5 @@ if buscar or query:
             st.caption(f"Documentos com o mesmo rank em ambos os motores: {concordancia}/{len(CORPUS)}")
 
 st.markdown("---")
-with st.expander("📚 Base de Documentos (Corpus Médico Completo)"):
+with st.expander("Base de Documentos (Corpus Médico Completo)"):
     st.dataframe(pd.DataFrame(CORPUS)[["id", "titulo", "texto"]], width='stretch', hide_index=True)
