@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-about:blank#blocked
+# -*- coding: utf-8 -*-
 """
 HealthSearch — Motor de Busca Híbrido (BM25 + Busca Semântica Vetorial + RRF)
 ==============================================================================
@@ -267,6 +267,16 @@ def rrf_fusion(rank_bm25: dict, rank_semantico: dict, alpha: float, k_rrf: int =
 # ==========================================================================
 
 st.set_page_config(page_title="HealthSearch — Busca Híbrida", page_icon="🩺", layout="wide")
+
+# Remove o botão "Deploy" da barra superior do Streamlit
+st.markdown(
+    """
+    <style>
+        .stDeployButton {display: none;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 st.title("🩺 HealthSearch — Motor de Busca Híbrido")
 st.caption(
